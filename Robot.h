@@ -25,6 +25,8 @@
 #include <frc/Compressor.h>
 #include <frc/Solenoid.h>
 #include <frc/DoubleSolenoid.h>
+#include <frc/AnalogInput.h>
+#include <frc/AnalogOutput.h>
 
 class Robot : public frc::TimedRobot
 {
@@ -69,6 +71,8 @@ class Robot : public frc::TimedRobot
   //frc::DigitalInput TestSwitch = frc::DigitalInput(0); //Limit Switch
   frc::DigitalInput BackSwitch = frc::DigitalInput(1);
   frc::DigitalInput SideSwitch = frc::DigitalInput(0);
+  frc::AnalogInput Bottom1 = frc::AnalogInput(0);
+  frc::AnalogInput Bottom2 = frc::AnalogInput(1);
    
  public:
   
@@ -121,15 +125,15 @@ class Robot : public frc::TimedRobot
   frc::XboxController Driver = frc::XboxController (0);
   frc::XboxController Manipulator = frc::XboxController (1);
 
-  double IntakeSpeed = 1500;
-  double Lower = 1500; 
-  double Higher = 3000;
+  double IntakeSpeed = 2000;
+  double Lower = 1000; 
+  double Higher = 2600;
   bool StartMath = false;
-  int A = 5; //2 ball
+  int A = 5; //2 ball 
   int B = 10; //3 ball
   int C = 10; //4 ball
   int D = 10; //5 ball
-  int Hang = 10;
+  int Hang = 0;
   int Shooting = 10;
   
  Robot()
