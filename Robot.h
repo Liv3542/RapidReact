@@ -1,7 +1,3 @@
-// Copyright (c) FIRST and other WPILib contributors.
-// Open Source Software; you can modify and/or share it under the terms of
-// the WPILib BSD license file in the root directory of this project.
-
 #pragma once
 
 #include <string>
@@ -51,12 +47,18 @@ class Robot : public frc::TimedRobot
     rev::SparkMaxRelativeEncoder BottomShooterEncoder = BottomShooter.GetEncoder();
 
   TalonFX ShooterAngle {7};
+  CANCoder ShooterEncoder {15};
 
   rev::CANSparkMax Magazine = rev::CANSparkMax(8, rev::CANSparkMax::MotorType::kBrushless);
     rev::SparkMaxPIDController MagazinePID = Magazine.GetPIDController();
 
-  TalonSRX ClimberAngle1 {10}; 
-  TalonSRX ClimberAngle2 {11};
+  rev::CANSparkMax ClimberAngle1 = rev::CANSparkMax(10, rev::CANSparkMax::MotorType::kBrushless); 
+    rev::SparkMaxPIDController ClimberAngle1PID = ClimberAngle1.GetPIDController();
+    rev::SparkMaxRelativeEncoder ClimberAngle1Encoder = ClimberAngle1.GetEncoder();
+
+  rev::CANSparkMax ClimberAngle2 = rev::CANSparkMax(11, rev::CANSparkMax::MotorType::kBrushless);
+    rev::SparkMaxPIDController ClimberAngle2PID = ClimberAngle2.GetPIDController();
+    rev::SparkMaxRelativeEncoder ClimberAngle2Encoder = ClimberAngle2.GetEncoder();
 
   rev::CANSparkMax Climber1 = rev::CANSparkMax(12, rev::CANSparkMax::MotorType::kBrushless); 
     rev::SparkMaxRelativeEncoder Climber1Encoder = Climber1.GetEncoder();
@@ -69,10 +71,10 @@ class Robot : public frc::TimedRobot
   VictorSPX Intake1 {14};
   
   //frc::DigitalInput TestSwitch = frc::DigitalInput(0); //Limit Switch
-  frc::DigitalInput BackSwitch = frc::DigitalInput(1);
-  frc::DigitalInput SideSwitch = frc::DigitalInput(0);
-  frc::AnalogInput Bottom1 = frc::AnalogInput(0);
-  frc::AnalogInput Bottom2 = frc::AnalogInput(1);
+  // frc::DigitalInput BackSwitch = frc::DigitalInput(1);
+  // frc::DigitalInput SideSwitch = frc::DigitalInput(0);
+  frc::AnalogInput Bottom1 = frc::AnalogInput(1);
+  frc::AnalogInput Bottom2 = frc::AnalogInput(0);
    
  public:
   
@@ -119,17 +121,22 @@ class Robot : public frc::TimedRobot
   frc::Timer PathTime = frc::Timer();
   frc::Timer Climber = frc::Timer();
   frc::Timer Intaking = frc::Timer();
+  frc::Timer Shot = frc::Timer();
 
   units::second_t time_to = units::second_t(5);
 
   frc::XboxController Driver = frc::XboxController (0);
   frc::XboxController Manipulator = frc::XboxController (1);
 
-  double IntakeSpeed = 2000;
+  double IntakeSpeed = 3000;
   double Lower = 1000; 
-  double Higher = 2600;
+  double Higher = 2900;
+  double Safe = 3900;
   bool StartMath = false;
-  int A = 5; //2 ball 
+  bool TimerStart = false;
+  bool Traversal = false;
+  bool ShooterCode = false;
+  int A = 10; //2 ball 
   int B = 10; //3 ball
   int C = 10; //4 ball
   int D = 10; //5 ball
