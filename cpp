@@ -4,12 +4,16 @@
 
 #include "Robot.h"
 #include <fmt/core.h>
-#include <networktables/NetworkTable.h>
-#include <networktables/NetworkTableEntry.h>
-#include <networktables/NetworkTableInstance.h>
+#include "networktables/NetworkTable.h"
+#include "networktables/NetworkTableEntry.h"
+#include "networktables/NetworkTableInstance.h"
+#include "frc/smartdashboard/SmartDashboard.h"
+#include "networktables/NetworkTableValue.h"
+#include "wpi/span.h"
 
 void Robot::RobotInit() 
 {
+
   frc::SmartDashboard::PutData("Auto Modes", &m_chooser);
   m_chooser.SetDefaultOption(kThreeBall, kThreeBall);
   m_chooser.AddOption(kTwoBall, kTwoBall);
@@ -26,8 +30,15 @@ void Robot::RobotInit()
   RightDrive1.ConfigClosedloopRamp(1);
   LeftDrive1.ConfigClosedloopRamp(1);
 
+    //Sets Current limits
+  SupplyCurrentLimitConfiguration Limits = SupplyCurrentLimitConfiguration(true, 20, 30, 1);
+  RightDrive1.ConfigSupplyCurrentLimit(Limits);
+  RightDrive2.ConfigSupplyCurrentLimit(Limits);
+  LeftDrive1.ConfigSupplyCurrentLimit(Limits);
+  LeftDrive2.ConfigSupplyCurrentLimit(Limits);
+
   ShooterAngle.ConfigClosedloopRamp(1);
-  ShooterAngle.ConfigPeakOutputReverse(1);
+  ShooterAngle.ConfigPeakOutputReverse(-1);
 
   //Power Limit
   RightDrive1.ConfigPeakOutputForward(.65);
@@ -36,17 +47,11 @@ void Robot::RobotInit()
   ShooterAngle.ConfigPeakOutputForward(1);
   ShooterAngle.SetNeutralMode(Brake);
 
-  ClimberAngle1.ConfigPeakOutputForward(.4);
-  ClimberAngle2.ConfigPeakOutputForward(.4);
-
-  Climber1PID.SetOutputRange(-.5, .5);
-  Climber2PID.SetOutputRange(-.5, .5);
+  // ClimberAngle1.ConfigPeakOutputForward(.4);
+  // ClimberAngle2.ConfigPeakOutputForward(.4);
 
   TopShooter.SetClosedLoopRampRate(1.5);
   BottomShooter.SetClosedLoopRampRate(1.5);
-
-  Climber2.BurnFlash();
-  Climber1.BurnFlash();
 
   //Defines Trajectory 
   trajectory = GenerateTrajectory();
@@ -74,19 +79,32 @@ void Robot::RobotInit()
   //rotation
   Pigeon.SetFusedHeading(0, 30);
 
-  ClimberAngle1.ConfigFactoryDefault();
-  ClimberAngle2.ConfigFactoryDefault();
+  // ClimberAngle1.ConfigFactoryDefault();
+  // ClimberAngle2.ConfigFactoryDefault();
 
-  Climber1.RestoreFactoryDefaults();
-  Climber2.RestoreFactoryDefaults();
+  // Climber1.RestoreFactoryDefaults();
+  // Climber2.RestoreFactoryDefaults();
 
   TopShooter.RestoreFactoryDefaults();
   BottomShooter.RestoreFactoryDefaults();
 
-  ShooterAngle.ConfigFactoryDefault();
+  // ShooterAngle.ConfigFactoryDefault();
 
   Climber2.SetClosedLoopRampRate(.5);
   Climber1.SetClosedLoopRampRate(.5);
+
+  Climber1PID.SetOutputRange(0, .5);
+  Climber2PID.SetOutputRange(0, .5);
+
+  Climber1.BurnFlash();
+  Climber2.BurnFlash();
+
+  //Min and Max power
+  ClimberAngle1PID.SetOutputRange(-1, 1);
+  ClimberAngle2PID.SetOutputRange(-1, 1);
+
+  ClimberAngle1.BurnFlash();
+  ClimberAngle2.BurnFlash();
 
   //Setting Inversion
   RightDrive1.SetInverted(true);
@@ -111,11 +129,11 @@ void Robot::RobotInit()
   RightDrive1.ConfigSelectedFeedbackSensor(FeedbackDevice::IntegratedSensor, 0, 10);
 
   //Defining Climb encoders
-  ClimberAngle1.ConfigSelectedFeedbackSensor(FeedbackDevice::CTRE_MagEncoder_Relative, 0, 10);
-  ClimberAngle2.ConfigSelectedFeedbackSensor(FeedbackDevice::CTRE_MagEncoder_Relative, 0, 10);
+  // ClimberAngle1.ConfigSelectedFeedbackSensor(FeedbackDevice::CTRE_MagEncoder_Relative, 0, 10);
+  // ClimberAngle2.ConfigSelectedFeedbackSensor(FeedbackDevice::CTRE_MagEncoder_Relative, 0, 10);
 
   //ShooterAngle.ConfigIntegratedSensorAbsoluteRange(AbsoluteSensorRange::Signed_PlusMinus180, 10);
-  ShooterAngle.ConfigSelectedFeedbackSensor(FeedbackDevice::IntegratedSensor, 0, 10);
+  // ShooterAngle.ConfigSelectedFeedbackSensor(FeedbackDevice::IntegratedSensor, 0, 10);
   
   //Shooter PIDS
   TopShooterPID.SetP(.00006, 0); 
@@ -140,26 +158,219 @@ void Robot::RobotInit()
   LeftDrive1.Config_kI(0, .0001);
   RightDrive1.Config_kI(0,.0001);
 
-  ShooterAngle.Config_kP(0, .01); 
-  ShooterAngle.Config_kI(0, .000035); 
-  ShooterAngle.Config_kD(0, .1); 
-  ShooterAngle.Config_kF(0, 0);
+  // ShooterAngle.Config_kP(0, .01); 
+  // ShooterAngle.Config_kI(0, .000035); 
+  // ShooterAngle.Config_kD(0, .1); 
+  // ShooterAngle.Config_kF(0, 0);
 
   Intake1.Config_kP(0, .1);
 
-  Climber1PID.SetP(.04, 0);
-  Climber2PID.SetP(.04, 0);
+  // Climber1PID.SetP(.04, 0);
+  // Climber2PID.SetP(.04, 0);
 
-  Climber1PID.SetI(0, 0);//.0000005
-  Climber2PID.SetI(0, 0);
+  // Climber1PID.SetI(0, 0);//.0000005
+  // Climber2PID.SetI(0, 0);
 
-  Climber1PID.SetD(0, 0);//.0006
-  Climber2PID.SetD(0, 0);
+  // Climber1PID.SetD(0, 0);//.0006
+  // Climber2PID.SetD(0, 0);
 
-  ClimberAngle1.Config_kP(0, .3);
-  ClimberAngle2.Config_kP(0, .3);
+    ClimberAngle1PID.SetP(0.6, 0);
+    ClimberAngle2PID.SetP(0.6, 0);
 
 }
+//   //Auto Chooser
+//   frc::SmartDashboard::PutData("Auto Modes", &m_chooser);
+//   m_chooser.SetDefaultOption(kThreeBall, kThreeBall);
+//   m_chooser.AddOption(kTwoBall, kTwoBall);
+//   m_chooser.AddOption(kFourBall, kFourBall);
+//   m_chooser.AddOption(kFiveBall, kFiveBall);
+  
+//   //Turns on Compressor
+//   Compressor1.Enabled();
+
+//  //Defines Trajectory 
+//   trajectory = GenerateTrajectory();
+//   trajectory2 = GenerateTrajectory2();
+//   trajectory3 = GenerateTrajectory3();
+//   trajectory4 = GenerateTrajectory4();
+//   trajectory5 = GenerateTrajectory5();
+//   trajectory6 = GenerateTrajectory6();
+//   trajectory7 = GenerateTrajectory7();
+//   trajectory8 = GenerateTrajectory8();
+//   trajectory9 = GenerateTrajectory9();
+//   trajectory10 = GenerateTrajectory10();
+//   /*trajectory11 = GenerateTrajectory11();
+//   trajectory12 = GenerateTrajectory12();
+//   trajectory13 = GenerateTrajectory13();
+//   trajectory14 = GenerateTrajectory14();
+//   trajectory15 = GenerateTrajectory15();
+//   trajectory16 = GenerateTrajectory16();*/
+
+//   //Puts trajectory on smart Dashboard
+//   frc::SmartDashboard::PutNumber("NumSetPointsRobotInit", trajectory.TotalTime().value());
+
+//   //Configures Defult settings
+//   Pigeon.ConfigFactoryDefault();
+
+//   //Rotation
+//   Pigeon.SetFusedHeading(0, 30);
+
+//   //Follow command
+//   RightDrive2.Follow(RightDrive1);
+//   LeftDrive2.Follow(LeftDrive1);
+
+//   //Controls Ramp Rate (Auto)
+//   RightDrive1.ConfigClosedloopRamp(1);
+//   LeftDrive1.ConfigClosedloopRamp(1);
+
+//   //Control Ramp Rate (Teleop)
+//   RightDrive1.ConfigOpenloopRamp(.1);
+//   LeftDrive1.ConfigOpenloopRamp(.1);
+
+//   //Power Limit
+//   RightDrive1.ConfigPeakOutputForward(1);
+//   LeftDrive1.ConfigPeakOutputForward(1);
+
+//   //Sets Current limits
+//   SupplyCurrentLimitConfiguration Limits = SupplyCurrentLimitConfiguration(true, 20, 30, 1);
+//   RightDrive1.ConfigSupplyCurrentLimit(Limits);
+//   RightDrive2.ConfigSupplyCurrentLimit(Limits);
+//   LeftDrive1.ConfigSupplyCurrentLimit(Limits);
+//   LeftDrive2.ConfigSupplyCurrentLimit(Limits);
+
+//   //Setting Inversion
+//   RightDrive1.SetInverted(true);
+//   LeftDrive1.SetInverted(false);
+
+//   //Follow Comand
+//   RightDrive2.SetInverted(InvertType::FollowMaster);
+//   LeftDrive2.SetInverted(InvertType::FollowMaster);
+
+//   //Defines Drive Sensor
+//   LeftDrive1.ConfigSelectedFeedbackSensor(FeedbackDevice::IntegratedSensor, 0, 10);
+//   RightDrive1.ConfigSelectedFeedbackSensor(FeedbackDevice::IntegratedSensor, 0, 10);
+
+//   //Drive PIDS
+//   RightDrive1.Config_kP(0, 0.6);
+//   LeftDrive1.Config_kP(0, 0.6);
+//   RightDrive1.Config_kD(0, 100);
+//   LeftDrive1.Config_kD(0, 100);
+//   LeftDrive1.Config_kI(0, .0001);
+//   RightDrive1.Config_kI(0,.0001);
+
+//   //Shooter Defult
+//   //ShooterAngle.ConfigFactoryDefault();
+
+//   //Defines Shooter Encoder
+//   //ShooterAngle.ConfigIntegratedSensorAbsoluteRange(AbsoluteSensorRange::Signed_PlusMinus180, 10);
+//   //ShooterAngle.ConfigSelectedFeedbackSensor(FeedbackDevice::IntegratedSensor, 0, 10);
+
+//   //Ramp rate sensor
+//   ShooterAngle.ConfigClosedloopRamp(1);
+
+//   //Back and Forward power
+//   ShooterAngle.ConfigPeakOutputReverse(-1);
+//   ShooterAngle.ConfigPeakOutputForward(1);
+
+//   //Sets mode to neutral
+//   ShooterAngle.SetNeutralMode(Brake);
+
+//   //Shooter Angle PIDs
+//   ShooterAngle.Config_kP(0, .1); 
+//   ShooterAngle.Config_kI(0, .000035); 
+//   ShooterAngle.Config_kD(0, .1); 
+//   ShooterAngle.Config_kF(0, 0);
+
+//   //Defines the Shooter encoder to use the shooter angle motor
+//   //ShooterAngle.ConfigRemoteFeedbackFilter(ShooterEncoder.GetDeviceNumber(), RemoteSensorSource::RemoteSensorSource_CANCoder, 0);
+//   //ShooterAngle.ConfigSelectedFeedbackSensor(RemoteFeedbackDevice::RemoteSensor0);
+
+//   //Restores factory setting
+//   // TopShooter.RestoreFactoryDefaults();
+//   // BottomShooter.RestoreFactoryDefaults();
+
+//   //Sets Velocity ramp rate
+//   TopShooter.SetClosedLoopRampRate(1.5);
+//   BottomShooter.SetClosedLoopRampRate(1.5);
+    
+//   TopShooter.BurnFlash();
+//   BottomShooter.BurnFlash();
+
+//   //Sets inversions
+//   TopShooter.SetInverted(false);
+//   BottomShooter.SetInverted(true);
+
+//   //Shooter PIDS
+//   TopShooterPID.SetP(.002, 0); //.00001
+//   BottomShooterPID.SetP(.002, 0); //.00001
+//   TopShooterPID.SetI(0, 0); //.000001
+//   BottomShooterPID.SetI(0, 0); //.000001
+//   TopShooterPID.SetD(0, 0); //.03
+//   BottomShooterPID.SetD(0, 0); //.03
+
+//   //Puts on Motor Controller
+
+//   //Sets inversion 
+//   Magazine.SetInverted(true);
+
+//   //Magazine PID
+//   MagazinePID.SetP(.0001);
+
+//   //Sets inversion
+//   Intake1.SetInverted(false);
+
+//   //Intake PID
+//   Intake1.Config_kP(0, .1);
+
+//   //Resotres Factory defults
+//   //ClimberAngle1.RestoreFactoryDefaults();
+//   //ClimberAngle2.RestoreFactoryDefaults();
+
+//   //Min and Max power
+//   ClimberAngle1PID.SetOutputRange(-1, 1);
+//   ClimberAngle2PID.SetOutputRange(-1, 1);
+
+//   //Sets inversion
+//   ClimberAngle1.SetInverted(true);
+//   ClimberAngle2.SetInverted(true);
+
+//   //moves to motor controller
+//   ClimberAngle1.BurnFlash();
+//   ClimberAngle2.BurnFlash();
+
+//   //Climber Angle PID
+//   ClimberAngle1PID.SetP(0.6, 0);
+//   ClimberAngle2PID.SetP(0.6, 0);
+
+//   //Restores Factory defult
+//   Climber1.RestoreFactoryDefaults();
+//   Climber2.RestoreFactoryDefaults();
+
+//   //Min and max Power
+//   Climber1PID.SetOutputRange(0, .5);
+//   Climber2PID.SetOutputRange(0, .5);
+
+//   //Position movement power
+//   Climber2.SetClosedLoopRampRate(.5);
+//   Climber1.SetClosedLoopRampRate(.5);
+
+//   //Sets the Inversions
+//   Climber1.SetInverted(true);
+//   Climber2.SetInverted(true);
+
+//   //Moves to motor controller
+//   Climber2.BurnFlash();
+//   Climber1.BurnFlash();
+
+  //Climber PID
+  // Climber1PID.SetP(.041, 0);
+  // Climber2PID.SetP(.041, 0);
+  // Climber1PID.SetI(0, 0);//.0000005
+  // Climber2PID.SetI(0, 0);
+  // Climber1PID.SetD(0, 0);//.0006
+  // Climber2PID.SetD(0, 0);
+
+//}
 
 /**
  * This function is called every robot packet, no matter the mode. Use
@@ -169,12 +380,49 @@ void Robot::RobotInit()
  * <p> This runs after the mode specific periodic functions, but before
  * LiveWindow and SmartDashboard integrated updating.
  */
-void Robot::RobotPeriodic() {
+void Robot::RobotPeriodic() 
+{
   /*if(Hang == 0)
   {
     Climber1PID.SetReference(0, rev::ControlType::kPosition);
     Climber2PID.SetReference(0, rev::ControlType::kPosition);
   }*/
+    //std::shared_ptr/*<NetworkTable>*/ table = nt::NetworkTableInstance::GetDefault().GetTable("limelight");
+    /*double targetOffsetAngle_Horizontal = table->GetNumber("tx",0.0);
+    double targetOffsetAngle_Vertical = table->GetNumber("ty",0.0);
+    double targetArea =  table->GetNumber("ta",0.0);
+    double targetSkew = table->GetNumber("ts",0.0); 
+    double targetValid = table->GetNumber("tv",0.0);
+    double latency = table->GetNumber("tl",0.0);
+    double shortSidelength = table->GetNumber("tshort",0.0);
+    double longSidelength = table->GetNumber("tlong",0.0);
+    double horizontalSidelength = table->GetNumber("thor",0.0);
+    double verticalSidelength = table->GetNumber("tvert",0.0);
+    double activePipeline = table->GetNumber("getpipe",0.0);
+    double threeD_position = table->GetNumber("camtram",0.0);
+    double xCorrdinates_arrays = table->GetNumber("tcornx",0.0);
+    double yCorrdinates_arrays = table->GetNumber("tcorny",0.0);
+    double xRaw_screenspace = table->GetNumber("tx0",0.0);
+    double yRaw_screenspace = table->GetNumber("ty0",0.0);
+    double area_percent = table->GetNumber("ta0",0.0);
+    double skewRotation_degree = table->GetNumber("ts0",0.0);
+    double screenspaceX_Raw = table->GetNumber("tx1",0.0);
+    double screenspaceY_Raw = table->GetNumber("ty1",0.0);
+    double image_Area = table->GetNumber("ta1",0.0);
+    double Rotation_skew = table->GetNumber("ts1",0.0);    
+    double Y_rawScreenspace = table->GetNumber("tx2",0.0);    
+    double x_rawScreenspace = table->GetNumber("ty2",0.0);
+    double Area_image = table->GetNumber("ta2",0.0);
+    double Skew_rotation = table->GetNumber("ts2",0.0);
+    double xCrossheir_A = table->GetNumber("cx0",0.0);
+    double yCrossheir_A = table->GetNumber("cy0",0.0);
+    double xCrossheir_B = table->GetNumber("cx1",0.0);
+    double yCrossheir_B = table->GetNumber("cy1",0.0);
+    frc::SmartDashboard::PutNumber("targetArea", targetArea);
+    frc::SmartDashboard::PutNumber("targetSkew",targetSkew);
+    frc::SmartDashboard::PutNumber("tx",targetOffsetAngle_Horizontal);
+    frc::SmartDashboard::PutNumber("ty",targetOffsetAngle_Vertical);*/
+
 }
 
 /**
@@ -226,8 +474,9 @@ void Robot::AutonomousPeriodic() //Total of 12 to 16 trajectories
   frc::SmartDashboard::PutNumber("OdometryTrackerY", FieldPosition.Y().value());
   frc::SmartDashboard::PutNumber("OdometryTrackerAngle", FieldPosition.Rotation().Degrees().value());
   frc::SmartDashboard::PutNumber("ShooterAngle", ShooterAngle.GetSelectedSensorPosition());
+  frc::SmartDashboard::PutNumber("ShooterIterm", ShooterAngle.GetIntegralAccumulator());
 
-  if (m_autoSelected == kTwoBall) //Could change it to be 1 trajectory depending on where we shoot from
+  if (m_autoSelected == kTwoBall)
   {
     // Custom Auto goes here
       switch (A)
@@ -235,30 +484,31 @@ void Robot::AutonomousPeriodic() //Total of 12 to 16 trajectories
         //Shoot
         case 5:
         {
-          ShooterAngle.Set(ControlMode::Position, 1900); //4500
+          ShooterAngle.Config_kP(0, 1.25); //.01
+          ShooterAngle.Config_kI(0, .000033); //.000035
+          ShooterAngle.Config_kD(0, .1);
+          ShooterAngle.Set(ControlMode::Position, 80); //4500
           TopShooterPID.SetReference(Higher, rev::ControlType::kVelocity); //lower
           BottomShooterPID.SetReference(Higher+500, rev::ControlType::kVelocity); //lower
-          if(ShooterAngle.GetSelectedSensorPosition()>=1900)
+          if(ShooterAngle.GetSelectedSensorPosition()>=75)
           {
             A = 6;
           }
-        break;
         }
-        
+        break;
         case 6:
         {
           Intaking.Reset();
           Intaking.Start();
           A = 8;
-          break;
         }
-        
+        break;
         case 8:
         {
           if(BottomShooterEncoder.GetVelocity()>=Lower+400)
           {
             WheelStopper.Set(true);
-            Magazine.Set(-.45);
+            Magazine.Set(-.65);
             RightDrive1.Set(ControlMode::PercentOutput, 0);
             LeftDrive1.Set(ControlMode::PercentOutput, 0);
             frc::SmartDashboard::PutNumber("intakeTimer", Intaking.Get().value());
@@ -266,11 +516,10 @@ void Robot::AutonomousPeriodic() //Total of 12 to 16 trajectories
             {
               A = 10;
             }
-
           }
-          break;
         }
-         case 10:
+        break;
+        case 10:
         {
           //resets
           //stop motors
@@ -288,14 +537,15 @@ void Robot::AutonomousPeriodic() //Total of 12 to 16 trajectories
         case 15:
         {
           //Intake
-          ShooterAngle.Config_kP(0, .007); 
-          ShooterAngle.Config_kI(0, .0000035); 
+          ShooterAngle.Config_kP(0, .15); //.007
+          ShooterAngle.Config_kI(0, .00008); //..000005
+          ShooterAngle.Config_kD(0, 0);
           IntakePosition.Set(frc::DoubleSolenoid::Value::kForward);
           Intake1.Set(ControlMode::PercentOutput, 1);
-          ShooterAngle.Set(ControlMode::Position, -20500);
+          ShooterAngle.Set(ControlMode::Position, -1100);
           TopShooterPID.SetReference(-IntakeSpeed, rev::ControlType::kVelocity);
           BottomShooterPID.SetReference(-IntakeSpeed, rev::ControlType::kVelocity);
-          if(ShooterAngle.GetSelectedSensorPosition()<=-20400)
+          if(ShooterAngle.GetSelectedSensorPosition()<=-1100)
           {
             A = 20;
           }
@@ -312,34 +562,37 @@ void Robot::AutonomousPeriodic() //Total of 12 to 16 trajectories
           if(PathTime.HasElapsed(trajectory5.TotalTime()+units::time::second_t(.3)))
           {
             PathTime.Stop();
-            PathTime.Reset();
-            PathTime.Start();
+            // PathTime.Reset();
+            // PathTime.Start();
             //A = 0; //30
           }
-          
-            if(BackSwitch.Get() == 1 and SideSwitch.Get() == 1)
-            {
-              //All wheels move
-              Magazine.Set(.65);
-              WheelStopper.Set(true);
-            }
-            else if( BackSwitch.Get() == 0 and SideSwitch.Get() == 1)
-            {
-              //Back two wheels stop
-              WheelStopper.Set(false);
-              Magazine.Set(.65);
-              A = 23;
-            }
-            else if(BackSwitch.Get() == 0 and SideSwitch.Get() == 0)
-            {
-              Magazine.Set(0);
-              WheelStopper.Set(false);
-            }
-
+          if(Bottom1.GetValue()<=600 and Bottom2.GetValue() <=600)
+          {
+            //All wheels Move
+            Magazine.Set(.65);
+            WheelStopper.Set(true);
+          }
+          else if(Bottom1.GetValue()>=600 and Bottom2.GetValue()<=600)
+          {
+            //Back wheels stop
+            WheelStopper.Set(false);
+            Magazine.Set(.65);
+            
+          }
+          else if(Bottom1.GetValue()>=600 and Bottom2.GetValue()>=600)
+          {
+            //All wheels stop
+            Magazine.Set(0);
+            WheelStopper.Set(false);
+            A = 25;
+          }
         }
         break;
-        case 23:
+        case 25:
         {
+          //Intake in
+          //ShooterAngle goes to zero
+          //Everything else shuts off
           ShooterAngle.Set(ControlMode::Position, 0);
           RightDrive1.Set(ControlMode::PercentOutput, 0);
           LeftDrive1.Set(ControlMode::PercentOutput, 0);
@@ -348,60 +601,52 @@ void Robot::AutonomousPeriodic() //Total of 12 to 16 trajectories
           BottomShooter.Set(0);
           IntakePosition.Set(frc::DoubleSolenoid::kReverse);
           Intake1.Set(ControlMode::PercentOutput, 0);
-          A = 25;
-        }
-        break;
-        case 25:
-        {
-          ShooterAngle.Set(ControlMode::Position, 4500);
-          TopShooterPID.SetReference(3200, rev::ControlType::kVelocity);
-          BottomShooterPID.SetReference(3700, rev::ControlType::kVelocity);
-          if(ShooterAngle.GetSelectedSensorPosition()>=4400 and BottomShooterEncoder.GetVelocity()>=3600)
+          if(ShooterAngle.GetSelectedSensorPosition()>=-5)
           {
-            WheelStopper.Set(true);
-            Magazine.Set(-.45);
+            A = 27;
           }
-
+          
         }
         break;
-      //   case 30:
-      //   {
-      //     //moves back to starting position
-      //     const frc::Trajectory::State goal6 = trajectory6.Sample(PathTime.Get());
-      //     frc::ChassisSpeeds adjustedSpeeds6 = PathFollower6.Calculate(FieldPosition, goal6);
-      //     auto [left6, right6] = DriveKin.ToWheelSpeeds(adjustedSpeeds6);
-      //     RightDrive1.Set(ControlMode::Velocity, ConversionToRaw(left6));
-      //     LeftDrive1.Set(ControlMode::Velocity, ConversionToRaw(right6));
-      //     if(PathTime.HasElapsed(trajectory2.TotalTime()+units::time::second_t(.3)))
-      //     {
-      //       PathTime.Stop();
-      //       PathTime.Reset();
-      //       PathTime.Start();
-      //       A = 40;
-      //     }
-      //   }
-      //   break;
-      //   //Shoot
-      //   case 40:
-      //   {
-      //     TopShooterPID.SetReference(Lower, rev::ControlType::kVelocity);
-      //     BottomShooterPID.SetReference(Lower, rev::ControlType::kVelocity);
-      //     if(TopShooterEncoder.GetVelocity()>=1500)
-      //     {
-      //       WheelStopper.Set(true);
-      //       Magazine.Set(-.65);
-      //       if(BackSwitch.Get()==1 and SideSwitch.Get()==1)
-      //       {
-      //         Magazine.Set(0);
-      //         TopShooter.Set(0);
-      //         BottomShooter.Set(0);
-      //         A = 50;
-      //       }
-            
-      //     }
-      //   }
-      //   break;
-       }
+        case 27:
+        {
+          ShooterAngle.SetIntegralAccumulator(0,0,0);
+          ShooterAngle.Config_kP(0, 1.35);
+          ShooterAngle.Config_kI(0, 0);
+          if(ShooterAngle.GetSelectedSensorPosition()>=-100)
+          {
+            A = 30;
+          }
+        }
+        break;
+        case 30:
+        {
+          ShooterAngle.Config_kP(0, 1.25); //.01
+          ShooterAngle.Config_kI(0, 0); //.000033
+          ShooterAngle.Config_kD(0, .1);
+          ShooterAngle.Set(ControlMode::Position, 250);//80
+          TopShooterPID.SetReference(3300, rev::ControlType::kVelocity);
+          BottomShooterPID.SetReference(3500, rev::ControlType::kVelocity);
+          if(ShooterAngle.GetSelectedSensorPosition()>=240 and BottomShooterEncoder.GetVelocity()>=3490)
+          {
+            WheelStopper.Set(false);
+            Magazine.Set(-.65);
+            if(BottomShooterEncoder.GetVelocity()>=3490 and ShooterAngle.GetSelectedSensorPosition()>=240 and Bottom1.GetValue()>600)
+            {
+              if(!TimerStart)
+              {
+                Shot.Start();
+                TimerStart = true;
+              }
+              if(Shot.Get().value()>1)
+              {
+                WheelStopper.Set(true);
+              }
+            }
+          }
+        }
+        break;
+      }
     
   } 
 //   if(m_autoSelected == kFourBall) //4-5 trajectories depending on where we shoot from
@@ -469,7 +714,7 @@ void Robot::AutonomousPeriodic() //Total of 12 to 16 trajectories
 //       //shoot 1
 
     
-    }
+    //}
 //   }
 //   if(m_autoSelected == kFiveBall) //5-6 trajectories depending on where we shoot from
 //   {  
@@ -526,114 +771,143 @@ void Robot::AutonomousPeriodic() //Total of 12 to 16 trajectories
 //         //Same thing as four ball but shoot 2 at the end
 //     }
 //   }
-//   else //2-3 trajectories depending on where we shoot from
-//   {
-//     // Default Auto goes here (Three ball)
-//     switch (B)
-//     {
-//       //Shoot
-//       case 10:
-//       {
-//         //resets
-//         LeftDrive1.SetSelectedSensorPosition(0);
-//         RightDrive1.SetSelectedSensorPosition(0);
-//         m_odometry.ResetPosition(frc::Pose2d(units::length::meter_t(0),units::length::meter_t(0),
-//         PigeonToRotation(Status.heading)),PigeonToRotation(Status.heading));
-//         B = 20;
-//         PathTime.Start();
-//       }
-//       break;
-//       //intake
-//       case 20:
-//       {
-//         //move backwards
-//         const frc::Trajectory::State goal = trajectory.Sample(PathTime.Get());
-//         frc::ChassisSpeeds adjustedSpeeds = PathFollower.Calculate(FieldPosition, goal);
-//         auto [left, right] = DriveKin.ToWheelSpeeds(adjustedSpeeds);
-//         RightDrive1.Set(ControlMode::Velocity, ConversionToRaw(left));
-//         LeftDrive1.Set(ControlMode::Velocity, ConversionToRaw(right));
-//         if(PathTime.HasElapsed(trajectory.TotalTime()+units::time::second_t(.3)))
-//         {
-//           PathTime.Stop();
-//           PathTime.Reset();
-//           PathTime.Start();
-//           B = 30;
-//         }
-//       }
-//       break;
-//       //Trajectory to grab other ball
-//       //Trajectory to move back
-//       //shoot 2 balls
-//       //Everything past case 20 need to change
-//       case 30:
-//       {
-//         //moves back to starting position
-//         const frc::Trajectory::State goal2 = trajectory2.Sample(PathTime.Get());
-//         frc::ChassisSpeeds adjustedSpeeds2 = PathFollower2.Calculate(FieldPosition, goal2);
-//         auto [left2, right2] = DriveKin.ToWheelSpeeds(adjustedSpeeds2);
-//         RightDrive1.Set(ControlMode::Velocity, ConversionToRaw(left2));
-//         LeftDrive1.Set(ControlMode::Velocity, ConversionToRaw(right2));
-//         if(PathTime.HasElapsed(trajectory2.TotalTime()+units::time::second_t(.3)))
-//         {
-//           PathTime.Stop();
-//           PathTime.Reset();
-//           PathTime.Start();
-//           B = 40;
-//         }
-//       }
-//       break;
-//       //intake
-//       case 40:
-//       {
-//         //moves to second ball
-//         const frc::Trajectory::State goal3 = trajectory3.Sample(PathTime.Get());
-//         frc::ChassisSpeeds adjustedSpeeds3 = PathFollower3.Calculate(FieldPosition, goal3); //PathFollower4
-//         auto [left3, right3] = DriveKin.ToWheelSpeeds(adjustedSpeeds3);
-//         RightDrive1.Set(ControlMode::Velocity, ConversionToRaw(left3));
-//         LeftDrive1.Set(ControlMode::Velocity, ConversionToRaw(right3));
-//         if(PathTime.HasElapsed(trajectory3.TotalTime()+units::time::second_t(.3)))
-//         {
-//           PathTime.Stop();
-//           PathTime.Reset();
-//           PathTime.Start();
-//           B = 45;
-//         }
-//       }
-//       break;
-//       case 45:
-//       {
-//         //resets or rezero's values
-//         Pigeon.SetFusedHeading(0, 30);
-//         Pigeon.GetFusedHeading(Status);
-//         LeftDrive1.SetSelectedSensorPosition(0);
-//         RightDrive1.SetSelectedSensorPosition(0);
-//         m_odometry.ResetPosition(frc::Pose2d(units::length::meter_t(0),units::length::meter_t(0),
-//         PigeonToRotation(Status.heading)),PigeonToRotation(Status.heading));
-//         B = 50;
-//         PathTime.Start();
-//       }
-//       break;
-//       case 50:
-//       {
-//         //moves to shoot
-//         const frc::Trajectory::State goal4 = trajectory4.Sample(PathTime.Get());
-//         frc::ChassisSpeeds adjustedSpeeds4 = PathFollower4.Calculate(FieldPosition, goal4);         
-//         auto [left4, right4] = DriveKin.ToWheelSpeeds(adjustedSpeeds4);
-//         RightDrive1.Set(ControlMode::Velocity, ConversionToRaw(left4));
-//         LeftDrive1.Set(ControlMode::Velocity, ConversionToRaw(right4));
-//         if(PathTime.HasElapsed(trajectory4.TotalTime()+units::time::second_t(.3)))
-//         {
-//           PathTime.Stop();
-//           PathTime.Reset();
-//           PathTime.Start();            
-//           B = 60;
-//         }
-//       }
-//       break;
-//       //Shoot
-//     }
-//   }
-// }
+  else //2-3 trajectories depending on where we shoot from
+  {
+    // Default Auto goes here (Three ball)
+    switch (A)
+    {
+      //Shoot
+        case 10:
+        {
+          //resets
+          //stop motors
+          TopShooter.Set(0);
+          BottomShooter.Set(0);
+          Magazine.Set(0);
+          LeftDrive1.SetSelectedSensorPosition(0);
+          RightDrive1.SetSelectedSensorPosition(0);
+          m_odometry.ResetPosition(frc::Pose2d(units::length::meter_t(0),units::length::meter_t(0),
+          PigeonToRotation(Status.heading)),PigeonToRotation(Status.heading));
+          A = 15; //20
+          PathTime.Start();
+        }
+        break;
+        case 15:
+        {
+          //Intake
+          ShooterAngle.Config_kP(0, .15); //.007
+          ShooterAngle.Config_kI(0, .00008); //..000005
+          ShooterAngle.Config_kD(0, 0);
+          IntakePosition.Set(frc::DoubleSolenoid::Value::kForward);
+          Intake1.Set(ControlMode::PercentOutput, 1);
+          ShooterAngle.Set(ControlMode::Position, -1100);
+          TopShooterPID.SetReference(-IntakeSpeed, rev::ControlType::kVelocity);
+          BottomShooterPID.SetReference(-IntakeSpeed, rev::ControlType::kVelocity);
+          if(ShooterAngle.GetSelectedSensorPosition()<=-1100)
+          {
+            A = 20;
+          }
+        }
+        break;
+        case 20:
+        {
+          //move backwards
+          const frc::Trajectory::State goal = trajectory.Sample(PathTime.Get());
+          frc::ChassisSpeeds adjustedSpeeds = PathFollower.Calculate(FieldPosition, goal);
+          auto [left, right] = DriveKin.ToWheelSpeeds(adjustedSpeeds);
+          RightDrive1.Set(ControlMode::Velocity, ConversionToRaw(left));
+          LeftDrive1.Set(ControlMode::Velocity, ConversionToRaw(right));
+          if(PathTime.HasElapsed(trajectory.TotalTime()+units::time::second_t(.3)))
+          {
+            PathTime.Stop();
+            // PathTime.Reset();
+            // PathTime.Start();
+            //A = 0; //30
+          }
+          if(Bottom1.GetValue()<=600 and Bottom2.GetValue() <=600)
+          {
+            //All wheels Move
+            Magazine.Set(.65);
+            WheelStopper.Set(true);
+          }
+          else if(Bottom1.GetValue()>=600 and Bottom2.GetValue()<=600)
+          {
+            //Back wheels stop
+            WheelStopper.Set(false);
+            Magazine.Set(.65);
+            
+          }
+          else if(Bottom1.GetValue()>=600 and Bottom2.GetValue()>=600)
+          {
+            //All wheels stop
+            Magazine.Set(0);
+            WheelStopper.Set(false);
+            A = 25;
+          }
+        }
+        break;
+        case 25:
+        {
+          //Intake in
+          //ShooterAngle goes to zero
+          //Everything else shuts off
+          ShooterAngle.Set(ControlMode::Position, 0);
+          RightDrive1.Set(ControlMode::PercentOutput, 0);
+          LeftDrive1.Set(ControlMode::PercentOutput, 0);
+          Magazine.Set(0);
+          TopShooter.Set(0);
+          BottomShooter.Set(0);
+          IntakePosition.Set(frc::DoubleSolenoid::kReverse);
+          Intake1.Set(ControlMode::PercentOutput, 0);
+          if(ShooterAngle.GetSelectedSensorPosition()>=-5)
+          {
+            A = 27;
+          }
+          
+        }
+        break;
+        case 27:
+        {
+          ShooterAngle.SetIntegralAccumulator(0,0,0);
+          ShooterAngle.Config_kP(0, 1.35);
+          ShooterAngle.Config_kI(0, 0);
+          if(ShooterAngle.GetSelectedSensorPosition()>=-100)
+          {
+            A = 30;
+          }
+        }
+        break;
+        case 30:
+        {
+          ShooterAngle.Config_kP(0, 1.15); //.01
+          ShooterAngle.Config_kI(0, 0); //.000033
+          ShooterAngle.Config_kD(0, .1);
+          ShooterAngle.Set(ControlMode::Position, 250);//80
+          TopShooterPID.SetReference(3300, rev::ControlType::kVelocity);
+          BottomShooterPID.SetReference(3500, rev::ControlType::kVelocity);
+          if(ShooterAngle.GetSelectedSensorPosition()>=240 and BottomShooterEncoder.GetVelocity()>=3490)
+          {
+            
+            WheelStopper.Set(false);
+            Magazine.Set(-.65);
+            if(BottomShooterEncoder.GetVelocity()>=3490 and ShooterAngle.GetSelectedSensorPosition()>=240 and Bottom1.GetValue()>600)
+            {
+              if(!TimerStart)
+              {
+                Shot.Start();
+                TimerStart = true;
+              }
+              if(Shot.Get().value()>1)
+              {
+                WheelStopper.Set(true);
+              }
+            }
+          }
+        }
+        break;
+      }
+  }
+}
 void Robot::TeleopInit() 
 {
   //reset pigeon value to zero
@@ -643,8 +917,11 @@ void Robot::TeleopInit()
 void Robot::TeleopPeriodic() 
 {
   frc::SmartDashboard::PutNumber("ShooterPosition", ShooterAngle.GetSelectedSensorPosition());
-  frc::SmartDashboard::PutNumber("ClimbAngle1", ClimberAngle1.GetSelectedSensorPosition());
-  frc::SmartDashboard::PutNumber("ClimberAngle2", ClimberAngle2.GetSelectedSensorPosition());
+  frc::SmartDashboard::PutNumber("OldEncoderValue", ShooterAngle.GetSelectedSensorPosition(1));
+  frc::SmartDashboard::PutNumber("ShooterAnglePercentOut", ShooterAngle.GetMotorOutputPercent());
+  frc::SmartDashboard::PutNumber("ShooterClosedLoopError", ShooterAngle.GetClosedLoopError());
+  frc::SmartDashboard::PutNumber("ClimbAngle1", ClimberAngle1Encoder.GetPosition());
+  frc::SmartDashboard::PutNumber("ClimberAngle2", ClimberAngle2Encoder.GetPosition());
   frc::SmartDashboard::PutNumber("ClimberHeight1", Climber1Encoder.GetPosition());
   frc::SmartDashboard::PutNumber("ClimberHeight2", Climber2Encoder.GetPosition());
   frc::SmartDashboard::PutNumber("TopShootSpeed", TopShooterEncoder.GetVelocity());
@@ -652,16 +929,18 @@ void Robot::TeleopPeriodic()
   frc::SmartDashboard::PutNumber("ShooterSpeed", ShooterAngle.GetSelectedSensorVelocity());
   frc::SmartDashboard::PutNumber("HangingCase", Hang);
   frc::SmartDashboard::PutNumber("ITermShooter", ShooterAngle.GetIntegralAccumulator());
-  frc::SmartDashboard::PutNumber("BackSwitch", BackSwitch.Get());
-  frc::SmartDashboard::PutNumber("SideSwitch", SideSwitch.Get());
-  frc::SmartDashboard::PutNumber("Sensor", Bottom1.GetValue());
-  frc::SmartDashboard::PutNumber("LeftDrive", LeftDrive1.GetSelectedSensorPosition());
-  
-  //Drive off of Joysticks
-  RightDrive1.Set(ControlMode::PercentOutput, Driver.GetRightY()*-.65);
-  LeftDrive1.Set(ControlMode::PercentOutput, Driver.GetLeftY()*-.65);
+  //frc::SmartDashboard::PutNumber("BackSwitch", BackSwitch.Get());
+  //frc::SmartDashboard::PutNumber("SideSwitch", SideSwitch.Get());
+  frc::SmartDashboard::PutNumber("Bottom1Value", Bottom1.GetValue());
+  frc::SmartDashboard::PutNumber("Bottom2Value", Bottom2.GetValue());
+  frc::SmartDashboard::PutNumber("ClimberAnglePValue", ClimberAngle1PID.GetP());
+  frc::SmartDashboard::PutNumber("ShooterCode", Manipulator.GetStartButton());
+  frc::SmartDashboard::PutNumber("Test", Manipulator.GetBackButtonPressed());
+  frc::SmartDashboard::PutNumber("ShooterCodeValue", ShooterCode);
 
-  //ShooterAngle.Set(ControlMode::PercentOutput, Manipulator.GetRightY());
+  //Drive off of Joysticks
+  RightDrive1.Set(ControlMode::PercentOutput, Driver.GetRightY()*-.55);
+  LeftDrive1.Set(ControlMode::PercentOutput, Driver.GetLeftY()*-.55);
     
   /*if(Driver.GetXButton()==1)
   {
@@ -695,30 +974,63 @@ void Robot::TeleopPeriodic()
   {
     ShooterAngle.Set(ControlMode::PercentOutput, 0);
   }*/
+  
+  if(Driver.GetYButtonPressed()==1)
+  {
+    ShooterCode=!ShooterCode;
+  }
+  //Climbing Shooter position
+  if(ShooterCode == true)
+  {
+    if(Manipulator.GetLeftTriggerAxis()==1)
+    {
+      ShooterAngle.Config_kP(0, .15); //.007
+      ShooterAngle.Config_kI(0, .00008); //..000005
+      ShooterAngle.Config_kD(0, 0);
+      IntakePosition.Set(frc::DoubleSolenoid::Value::kForward);
+      if(IntakePosition.GetFwdChannel()==1)
+      {
+        ShooterAngle.Set(ControlMode::PercentOutput, Manipulator.GetRightY()*.25);
+      }
+    }
+    else
+    {
+
+      ShooterAngle.Config_kP(0, 0); 
+      ShooterAngle.Config_kI(0, 0); 
+      ShooterAngle.Config_kD(0, 0);
+      //ShooterAngle.Set(ControlMode::PercentOutput, 0);
+      IntakePosition.Set(frc::DoubleSolenoid::Value::kReverse);
+    }
+  }
+  //Normal Teleop Shooting
+  else
+  {
   //Intaking
   if(Driver.GetRightTriggerAxis()==0 and Driver.GetLeftTriggerAxis()==1 
   and Manipulator.GetAButton()==0 and Manipulator.GetBButton()==0 
-  and Manipulator.GetRightBumper()==0 and Manipulator.GetXButton()==0)
+  and Manipulator.GetYButton()==0 and Manipulator.GetXButton()==0)
   {
-    ShooterAngle.Config_kP(0, .007); //.007
-    ShooterAngle.Config_kI(0, .000005); //..000005
+    ShooterAngle.Config_kP(0, .15); //.007
+    ShooterAngle.Config_kI(0, .00008); //..000005
     ShooterAngle.Config_kD(0, 0);
     IntakePosition.Set(frc::DoubleSolenoid::Value::kForward);
     TopShooterPID.SetReference(-IntakeSpeed, rev::ControlType::kVelocity);
     BottomShooterPID.SetReference(-IntakeSpeed, rev::ControlType::kVelocity);
     if(IntakePosition.GetFwdChannel()==1)
     {
-      ShooterAngle.Set(ControlMode::Position, -20500);
+      ShooterAngle.Set(ControlMode::Position, -1100);
     }
-    if(ShooterAngle.GetSelectedSensorPosition()<=-19400)
+    if(ShooterAngle.GetSelectedSensorPosition()<=-1000)
     {
       Intake1.Set(ControlMode::PercentOutput, 1);
     }
   }
+  
   //reverse intake wheels
   else if(Driver.GetRightTriggerAxis()==1 and Driver.GetLeftTriggerAxis()==0 
   and Manipulator.GetAButton()==0 and Manipulator.GetBButton()==0 
-  and Manipulator.GetRightBumper()==0 and Manipulator.GetXButton()==0)
+  and Manipulator.GetYButton()==0 and Manipulator.GetXButton()==0)
   {
     IntakePosition.Set(frc::DoubleSolenoid::Value::kForward);
     Intake1.Set(ControlMode::PercentOutput, -.5);
@@ -727,95 +1039,113 @@ void Robot::TeleopPeriodic()
   //Forward shot high
   else if (Driver.GetRightTriggerAxis()==0 and Driver.GetLeftTriggerAxis()==0 
   and Manipulator.GetAButton()==1 and Manipulator.GetBButton()==0 
-  and Manipulator.GetRightBumper()==0 and Manipulator.GetXButton()==0)
+  and Manipulator.GetYButton()==0 and Manipulator.GetXButton()==0)
   {
-    ShooterAngle.Config_kP(0, .01); 
-    ShooterAngle.Config_kI(0, .000035); 
-    ShooterAngle.Config_kD(0, 0);
-    TopShooterPID.SetReference(2400, rev::ControlType::kVelocity);
-    BottomShooterPID.SetReference(2400+500, rev::ControlType::kVelocity);
-    ShooterAngle.Set(ControlMode::Position, -2100); //-4500
-    if(BottomShooterEncoder.GetVelocity()>=2400+400 and ShooterAngle.GetSelectedSensorPosition()<=-2100 and ShooterAngle.GetSelectedSensorPosition()>=-2850) //4500
+    ShooterAngle.Config_kP(0, 1.25); //.01
+    ShooterAngle.Config_kI(0, .000033); //.000035
+    ShooterAngle.Config_kD(0, .1);
+    TopShooterPID.SetReference(Higher, rev::ControlType::kVelocity);
+    BottomShooterPID.SetReference(Higher+500, rev::ControlType::kVelocity);
+    ShooterAngle.Set(ControlMode::Position, -110); //-4500
+    if(BottomShooterEncoder.GetVelocity()>=Higher+400 and ShooterAngle.GetSelectedSensorPosition()<=-105 and ShooterAngle.GetSelectedSensorPosition()>=-130) //4500
     {
       WheelStopper.Set(false);
       Magazine.Set(-.45);
-      if(BottomShooterEncoder.GetVelocity()>=2400+400 and ShooterAngle.GetSelectedSensorPosition()<=-2100 and ShooterAngle.GetSelectedSensorPosition()>=-2850) //-4500
+      if(BottomShooterEncoder.GetVelocity()>=Higher+400 and ShooterAngle.GetSelectedSensorPosition()<=-105 and Bottom1.GetValue()>600 and
+      ShooterAngle.GetSelectedSensorPosition()>=-130) //-4500
       {
         WheelStopper.Set(true);
       }
     }
   }
+  
   //Backward shot low
   else if (Driver.GetRightTriggerAxis()==0 and Driver.GetLeftTriggerAxis()==0 
   and Manipulator.GetAButton()==0 and Manipulator.GetBButton()==1 
-  and Manipulator.GetRightBumper()==0 and Manipulator.GetXButton()==0)
+  and Manipulator.GetYButton()==0 and Manipulator.GetXButton()==0)
   {
-    ShooterAngle.Config_kP(0, .01); 
-    ShooterAngle.Config_kI(0, .000035); 
-    ShooterAngle.Config_kD(0, 0);
+    ShooterAngle.Config_kP(0, 1.25); //.01
+    ShooterAngle.Config_kI(0, .000033); //.000035
+    ShooterAngle.Config_kD(0, .1);
     TopShooterPID.SetReference(Lower, rev::ControlType::kVelocity);
     BottomShooterPID.SetReference(Lower+500, rev::ControlType::kVelocity);
-    ShooterAngle.Set(ControlMode::Position, 4500);
-    if(BottomShooterEncoder.GetVelocity()>=Lower+400 and ShooterAngle.GetSelectedSensorPosition()>=4500 and ShooterAngle.GetSelectedSensorPosition()<=5250)
+    ShooterAngle.Set(ControlMode::Position, -220);
+    if(BottomShooterEncoder.GetVelocity()>=Lower+400 and ShooterAngle.GetSelectedSensorPosition()>=-250 and ShooterAngle.GetSelectedSensorPosition()<=-300)
     {
       WheelStopper.Set(false);
       Magazine.Set(-.45);
-      if(TopShooterEncoder.GetVelocity()>=Lower-100 and ShooterAngle.GetSelectedSensorPosition()>=4500 and SideSwitch.Get()==1 and ShooterAngle.GetSelectedSensorPosition()<=5250)
+      if(TopShooterEncoder.GetVelocity()>=Lower-100 and ShooterAngle.GetSelectedSensorPosition()>=-250 and Bottom1.GetValue()>600 and ShooterAngle.GetSelectedSensorPosition()<=-300)
       {
         WheelStopper.Set(true);
       }
     }
   }
 
-  //Reset Zero
+  //Safe Shot
   else if (Driver.GetRightTriggerAxis()==0 and Driver.GetLeftTriggerAxis()==0 
   and Manipulator.GetAButton()==0 and Manipulator.GetBButton()==0 
-  and Manipulator.GetRightBumper()==1 and Manipulator.GetXButton()==0)
+  and Manipulator.GetYButton()==1 and Manipulator.GetXButton()==0)
   {
-    ShooterAngle.Set(ControlMode::PercentOutput, Manipulator.GetRightY()*.1);
-    if(Manipulator.GetYButtonPressed()==1)
-    {
-      ShooterAngle.SetSelectedSensorPosition(0);
-    }
-  }
-  //Back Shot Higher
-  else if (Driver.GetRightTriggerAxis()==0 and Driver.GetLeftTriggerAxis()==0 
-  and Manipulator.GetAButton()==0 and Manipulator.GetBButton()==0 
-  and Manipulator.GetRightBumper()==0 and Manipulator.GetXButton()==1)
-  {
-    ShooterAngle.Config_kP(0, .01); 
-    ShooterAngle.Config_kI(0, .000035); 
-    ShooterAngle.Config_kD(0, 0);
-    TopShooterPID.SetReference(Higher, rev::ControlType::kVelocity);
-    BottomShooterPID.SetReference(Higher+500, rev::ControlType::kVelocity);
-    ShooterAngle.Set(ControlMode::Position, 1900); //-4500
-    if(BottomShooterEncoder.GetVelocity()>=Higher+400 and ShooterAngle.GetSelectedSensorPosition()>=1900 and ShooterAngle.GetSelectedSensorPosition()<=2650) 
+    ShooterAngle.Config_kP(0, 1.05); //.01
+    ShooterAngle.Config_kI(0, .000033); //.000035
+    ShooterAngle.Config_kD(0, .1);
+    TopShooterPID.SetReference(Safe, rev::ControlType::kVelocity);
+    BottomShooterPID.SetReference(Safe+200, rev::ControlType::kVelocity);
+    ShooterAngle.Set(ControlMode::Position, -260);
+    if(BottomShooterEncoder.GetVelocity()>=Safe+190 and ShooterAngle.GetSelectedSensorPosition()<=-255 
+    and ShooterAngle.GetSelectedSensorPosition()>=-265)
     {
       WheelStopper.Set(false);
-      Magazine.Set(-.45);
-      if(BottomShooterEncoder.GetVelocity()>=Higher+400 and ShooterAngle.GetSelectedSensorPosition()>=1900 and ShooterAngle.GetSelectedSensorPosition()<=2650) 
+      Magazine.Set(-.65);
+      if(BottomShooterEncoder.GetVelocity()>=Safe+190 and ShooterAngle.GetSelectedSensorPosition()<=-255 
+      and Bottom1.GetValue()>600 and ShooterAngle.GetSelectedSensorPosition()>=-265)
       {
         WheelStopper.Set(true);
       }
     }
   }
+  
+  //Back Shot High
+  else if (Driver.GetRightTriggerAxis()==0 and Driver.GetLeftTriggerAxis()==0 
+  and Manipulator.GetAButton()==0 and Manipulator.GetBButton()==0 
+  and Manipulator.GetYButton()==0 and Manipulator.GetXButton()==1)
+  {
+    ShooterAngle.Config_kP(0, 1.25); //.01
+    ShooterAngle.Config_kI(0, .000033); //.000035
+    ShooterAngle.Config_kD(0, .1);
+    TopShooterPID.SetReference(Higher, rev::ControlType::kVelocity);
+    BottomShooterPID.SetReference(Higher+500, rev::ControlType::kVelocity);
+    ShooterAngle.Set(ControlMode::Position, 80); //-4500
+    if(BottomShooterEncoder.GetVelocity()>=Higher+400 and ShooterAngle.GetSelectedSensorPosition()>=80 and ShooterAngle.GetSelectedSensorPosition()<=130) 
+    {
+      WheelStopper.Set(false);
+      Magazine.Set(-.45);
+      if(BottomShooterEncoder.GetVelocity()>=Higher+400 and ShooterAngle.GetSelectedSensorPosition()>=80 and Bottom1.GetValue()>600
+      and ShooterAngle.GetSelectedSensorPosition()<=130) 
+      {
+        WheelStopper.Set(true);
+      }
+    }
+  }
+  
   //everything turns off
   else
   {
-    ShooterAngle.Config_kP(0, .01); //.01
-    ShooterAngle.Config_kI(0, .000007); //.000035
+    ShooterAngle.Config_kP(0, .4); //.01
+    ShooterAngle.Config_kI(0, .000033); //.000035
     ShooterAngle.Config_kD(0, .1);
     ShooterAngle.Set(ControlMode::Position, 0);
+    //ShooterAngle.Set(ControlMode::PercentOutput, 0);
     Intake1.Set(ControlMode::PercentOutput, 0);
     TopShooter.Set(0);
     BottomShooter.Set(0);
     Magazine.Set(0);
-    if(ShooterAngle.GetSelectedSensorPosition()>=-5000)
+    if(ShooterAngle.GetSelectedSensorPosition()>=-1100)
     {
       IntakePosition.Set(frc::DoubleSolenoid::Value::kReverse);
     }
-
   }
+
     //All wheels move
     // if(Driver.GetLeftTriggerAxis()==1 and BackSwitch.Get() == 1 and SideSwitch.Get() == 1)
     //   {
@@ -834,31 +1164,23 @@ void Robot::TeleopPeriodic()
     //   Magazine.Set(0);
     //   WheelStopper.Set(false);
     // }
-    // if(Driver.GetLeftTriggerAxis()==1 and (Bottom1.GetValue()<=600) and Bottom2.GetValue() <=600)
-    //   {
-    //     //All wheels Move
-    //     Magazine.Set(.65);
-    //     WheelStopper.Set(true);
-    //   }
-    // else if(Driver.GetLeftTriggerAxis()==1 and Bottom1.GetValue()>=600 and Bottom2.GetValue()<=600)
-    // {
-    //    //Back wheels stop
-    //   WheelStopper.Set(false);
-    //   Magazine.Set(.65);
-    // }
-    // else if(Driver.GetLeftTriggerAxis()==1 and Bottom1.GetValue()>=600 and Bottom2.GetValue()>=600)
-    // {
-    //   //All wheels stop
-    //   Magazine.Set(0);
-    //   WheelStopper.Set(false);
-    // }
-    if(/*Driver.GetBButton()==1 and*/ Bottom1.GetValue()<=600)
+    if(Driver.GetLeftTriggerAxis()==1 and Bottom1.GetValue()<=600 and Bottom2.GetValue()<=600)
+      {
+        //All wheels Move
+        Magazine.Set(.65);
+        WheelStopper.Set(true);
+      }
+    else if(Driver.GetLeftTriggerAxis()==1 and Bottom1.GetValue()>=600 and Bottom2.GetValue()<=600)
     {
-      LeftDrive1.Set(ControlMode::PercentOutput, 0);
+      //Back wheels stop
+      Magazine.Set(.65);
+      WheelStopper.Set(false);
     }
-    else if(/*Driver.GetBButton()==1 and*/ Bottom1.GetValue()>=600)
+    else if(Driver.GetLeftTriggerAxis()==1 and Bottom1.GetValue()>=600 and Bottom2.GetValue()>=600)
     {
-      LeftDrive1.Set(ControlMode::PercentOutput, .5);
+      //All wheels stop
+      Magazine.Set(0);
+      WheelStopper.Set(false);
     }
 
     //resets integral to zero every time button is hit
@@ -869,119 +1191,233 @@ void Robot::TeleopPeriodic()
     {
       ShooterAngle.SetIntegralAccumulator(0,0,0);
     }
-    //Intake
-      //Driver axis or bumper depending X
-      //Intake position X
-      //Intake Speed X
-      //Ball holder that goes along with it X
-      //Sensors to stop the wheels
-    //climber to be fully programmed
-      //Climber on one button + over ride to restart climb or change position
-      //Climber on timer = completely autonomous (besides over ride)
-      //Hit A button
+  }
 
-  /*if(Manipulator.GetRightBumperPressed()==1)
-  { 
+  //  Climber1.Set(Manipulator.GetLeftY()*.1);
+  //  Climber2.Set(Manipulator.GetLeftY()*.1);
+  // if(Driver.GetXButton()==1 and Manipulator.GetLeftBumperPressed()==0)
+  // {
+  //   Climber1PID.SetP(.041, 0);
+  //   Climber2PID.SetP(.041, 0);
+
+  //   Climber1PID.SetI(0, 0);//.0000005
+  //   Climber2PID.SetI(0, 0);
+
+  //   Climber1PID.SetD(0, 0);//.0006
+  //   Climber2PID.SetD(0, 0);
+
+  //   Climber1PID.SetReference(0, rev::ControlType::kPosition);
+  //   Climber2PID.SetReference(0, rev::ControlType::kPosition);
+  //   // Climber1Encoder.SetPosition(0);
+  //   // Climber2Encoder.SetPosition(0);
+  // }
+  //Positive = down Rachet = false
+  //negative = up Rachet = true
+  // if(Manipulator.GetRightBumper()==0 and Manipulator.GetLeftBumper()==1)
+  // {
+  //   ClimberAngle1.Set(.1*Manipulator.GetRightY());
+  //   ClimberAngle2.Set(.1*Manipulator.GetRightY());
+  // }
+  // else if(Manipulator.GetRightBumper()==1 and Manipulator.GetLeftBumper()==0)
+  // {
+  //   Climber1.Set(.05*Manipulator.GetLeftY());
+  //   Climber2.Set(.05*Manipulator.GetLeftY());
+  // }
+  // else
+  // {
+  //   Climber1.Set(0);
+  //   Climber2.Set(0);
+  //   ClimberAngle1.Set(0);
+  //   ClimberAngle2.Set(0);
+  // }
+
+
+  if(Manipulator.GetLeftBumperPressed())
+  {
+    ClimbRachet.Set(true);
+
+    Climber1PID.SetP(.045, 0);
+    Climber2PID.SetP(.045, 0);
+    Climber1PID.SetI(0, 0);//.0000005
+    Climber2PID.SetI(0, 0);
+    Climber1PID.SetD(0, 0);//.0006
+    Climber2PID.SetD(0, 0);
+
     Hang = 10;
   }
     switch (Hang)
       {
         case 0:
         {
-          //Climber1.Set(.05*Manipulator.GetRightY());
-          //Climber2.Set(.05*Manipulator.GetRightY());
-          Climber1PID.SetReference(2, rev::ControlType::kPosition);
-          Climber2PID.SetReference(2, rev::ControlType::kPosition);
+          if(Manipulator.GetRightBumper()==1)
+          {
+            ClimbRachet.Set(false);
+            Climber1.Set(.5*Manipulator.GetLeftY());
+            Climber2.Set(.5*Manipulator.GetLeftY());
+            // ClimberAngle1.Set(.1*Manipulator.GetRightY());
+            // ClimberAngle2.Set(.1*Manipulator.GetRightY());
+          }
+            
+          // Climber1PID.SetReference(2, rev::ControlType::kPosition);
+          // Climber2PID.SetReference(2, rev::ControlType::kPosition);
+          ClimberAngle1PID.SetReference(0, rev::ControlType::kPosition);
+          ClimberAngle2PID.SetReference(0, rev::ControlType::kPosition);
         }
         break;
         case 10:
         {
-          //Climb piviot back and pull arms up
-          ClimbRachet.Set(true);
-          //Set to 500 went to -26000
-          //ClimberAngle1.Set(ControlMode::Position, 500); //needs to be negative
-          //ClimberAngle2.Set(ControlMode::Position, 500);
-          Climber1PID.SetReference(28, rev::ControlType::kPosition); //-63.3
-          Climber2PID.SetReference(28, rev::ControlType::kPosition); //63.3
-          if(Manipulator.GetAButtonPressed()==1)//Climber1Encoder.GetPosition()<=-49 and ClimberAngle1.GetSelectedSensorPosition()<=-9 and
+          //Climb height arms extend and climb angle moves back
+          //ClimbRachet.Set(false);
+          ClimberAngle1PID.SetReference(-50.4, rev::ControlType::kPosition); 
+          ClimberAngle2PID.SetReference(-50.4, rev::ControlType::kPosition); 
+          Climber1PID.SetReference(-37, rev::ControlType::kPosition); 
+          Climber2PID.SetReference(-37, rev::ControlType::kPosition); 
+          if(ClimbRachet.Get()==true and Climber1Encoder.GetPosition()<=-1 and Climber2Encoder.GetPosition()<=-1)
           {
+            //Changes speed climber height arms
+            Climber1PID.SetOutputRange(-.5, .75);
+            Climber2PID.SetOutputRange(-.5, .75);
+            Climber1.BurnFlash();
+            Climber2.BurnFlash();
+            
+          }
+
+          if(Driver.GetAButtonPressed()==1 and Climber1Encoder.GetPosition()<-36.5 and ClimberAngle1Encoder.GetPosition()<-49 and ClimberAngle2Encoder.GetPosition()<-49)//Climber1Encoder.GetPosition()<=-49 and ClimberAngle1.GetSelectedSensorPosition()<=-9 and
+          {
+            
             Hang = 25; //25 0
+            ClimbRachet.Set(false);
           }
           
         }
         break;
-        case 20:
-        {
-          //climb piviot arms in
-          ClimberAngle1.Set(ControlMode::Position, 0);
-          ClimberAngle2.Set(ControlMode::Position, 0);
-          if(Manipulator.GetAButtonPressed()==1) //ClimberAngle1.GetSelectedSensorPosition()>=-10 
-          {
-            Hang = 0;//27
-          }
-        }
-        break;
         case 25:
         {
-          //pull down on pull arms
-          Climber1PID.SetReference(0, rev::ControlType::kPosition);
-          Climber2PID.SetReference(0, rev::ControlType::kPosition);
-          ClimbRachet.Set(false);
-          if(Manipulator.GetAButtonPressed()==1)//Climber1Encoder.GetPosition()>=-1
+          //Climber height arms retract/pull down
+          //ClimbRachet.Set(false);
+          Climber1PID.SetReference(-15, rev::ControlType::kPosition);//1
+          Climber2PID.SetReference(-15, rev::ControlType::kPosition);//1
+          if(Driver.GetAButtonPressed()==1 and Climber1Encoder.GetPosition()>-16)//Climber1Encoder.GetPosition()>=-1
           {
-            Hang = 0; //20
+            //ClimbRachet.Set(false);
+            Hang = 20;
           }
         }
         break;
-        //test before moving on
+        case 20:
+        {
+          //climb angle arms move in
+          ClimberAngle1PID.SetReference(0, rev::ControlType::kPosition);
+          ClimberAngle2PID.SetReference(0, rev::ControlType::kPosition);
+          if(Driver.GetAButtonPressed()==1 and ClimberAngle1Encoder.GetPosition()>-.5 and ClimberAngle2Encoder.GetPosition()>-.5) //ClimberAngle1.GetSelectedSensorPosition()>=-10 
+          {
+            Climber1PID.SetOutputRange(-.05, .05);
+            Climber2PID.SetOutputRange(-.05, .05);
+            Climber1.BurnFlash();
+            Climber2.BurnFlash();
+            Hang = 27;
+          }
+        }
+        break;
         case 27:
         {
-          //Move pull arms up
-          Climber1PID.SetReference(-1, rev::ControlType::kPosition);
-          Climber2PID.SetReference(1, rev::ControlType::kPosition);
-          if(Manipulator.GetAButtonPressed()==1) //Climber1Encoder.GetPosition()<=-.5 and 
+          //Climb height arms extend up a little
+          Climber1PID.SetReference(-5, rev::ControlType::kPosition);
+          Climber2PID.SetReference(-5, rev::ControlType::kPosition);
+          if(Driver.GetAButtonPressed()==1 and Climber1Encoder.GetPosition()<-4) //Climber1Encoder.GetPosition()<=-.5 and 
           {
+            Hang = 29;
+          }
+        }
+        break;
+        case 29:
+        {
+          //Climb angle arms move forward 
+          ClimberAngle1PID.SetReference(250, rev::ControlType::kPosition);
+          ClimberAngle2PID.SetReference(250, rev::ControlType::kPosition);
+          if(Driver.GetAButtonPressed()==1 and ClimberAngle1Encoder.GetPosition()>=249 and ClimberAngle2Encoder.GetPosition()>=249)
+          {
+            Climber1PID.SetOutputRange(-.5, .5);
+            Climber2PID.SetOutputRange(-.5, .5);
+            Climber1.BurnFlash();
+            Climber2.BurnFlash();
             Hang = 30;
           }
         }
         break;
         case 30:
         {
-          //timer starts and our pivot arms go forward
-          Climber.Reset();
-          Climber.Start();
-          ClimberAngle1.Set(ControlMode::Position, 30);
-          ClimberAngle1.Set(ControlMode::Position, 30);
-          if(Manipulator.GetAButtonPressed()==1) //Climber.Get()>= units::second_t(3)
+          // Climber.Reset();
+          // Climber.Start();
+          //Climb height arms extend the full distance
+          Climber1PID.SetReference(-30, rev::ControlType::kPosition);
+          Climber2PID.SetReference(-30, rev::ControlType::kPosition);
+          if(Driver.GetAButtonPressed()==1 and Climber1Encoder.GetPosition()<=-29) //Climber.Get()>= units::second_t(3)
           { 
-            Climber.Stop();
+            //Climber.Stop();
             Hang = 40;
           }
         }
         break;
         case 40:
         {
-          Climber1PID.SetReference(-50, rev::ControlType::kPosition); //-63.3
-          Climber2PID.SetReference(50, rev::ControlType::kPosition); //63.3
-          if(Manipulator.GetAButtonPressed()==1) //Climber1Encoder.GetPosition()<=-49 and 
+          //climb angle arms move back a little
+          ClimberAngle1PID.SetReference(240, rev::ControlType::kPosition); //-63.3
+          ClimberAngle2PID.SetReference(240, rev::ControlType::kPosition); //63.3
+          if(Driver.GetAButtonPressed()==1 and ClimberAngle1Encoder.GetPosition()<=241 and ClimberAngle2Encoder.GetPosition()<=241) //Climber1Encoder.GetPosition()<=-49 and 
           {
-            Hang = 0;//50
+            Hang = 45;//50
+          }
+        }
+        break;
+        case 45:
+        {
+          //Climb angle arms move back past climbing bar
+          //Climb height arms pull down a little
+
+          ClimberAngle1PID.SetReference(-50.4, rev::ControlType::kPosition);
+          ClimberAngle2PID.SetReference(-50.4, rev::ControlType::kPosition);
+          Climber1PID.SetReference(-20, rev::ControlType::kPosition);
+          Climber2PID.SetReference(-20, rev::ControlType::kPosition);
+          if(Driver.GetAButtonPressed()==1 and Climber1Encoder.GetPosition()>-21 and ClimberAngle1Encoder.GetPosition()<-50 and ClimberAngle2Encoder.GetPosition()<-50)
+          {
+            Hang = 50;
           }
         }
         break;
         case 50:
         {
-          Climber1Encoder.SetPosition(-2);
-          Climber2Encoder.SetPosition(-2);
-          Hang = 60;
+          //Climb height arms pull down the rest of the way
+          Climber1PID.SetReference(1, rev::ControlType::kPosition);
+          Climber2PID.SetReference(1, rev::ControlType::kPosition);
+          if(Driver.GetAButtonPressed()==1 and Climber1Encoder.GetPosition()<=1)
+          {
+            ClimbRachet.Set(false);
+            Hang = 0;
+          }
+          
         }
         break;
-        case 60:
+        /*case 60:
+        {
+          if(!Traversal)
+          {
+            Traversal = true;
+            Hang = 20;
+          }
+          else
+          {
+            Hang = 0;
+          }
+        }
+        break;*/
+        /*case 60:
         {
           Climber.Reset();
           Climber.Start();
-          ClimberAngle1.SetSelectedSensorPosition(30, 0, 10);
-          ClimberAngle2.SetSelectedSensorPosition(30, 0, 10);
+          ClimberAngle1Encoder.SetPosition(0);
+          ClimberAngle2Encoder.SetPosition(0);
+
           if(Climber.Get()>= units::second_t(3))
           {
             Climber.Stop();
@@ -1002,22 +1438,9 @@ void Robot::TeleopPeriodic()
           Climber2Encoder.SetPosition(-2);
           Hang = 90;
         }
-        break;
-      }*/
+        break;*/
+      }
   //}
-        //One climber hook to shoots up to grab bar
-        //Robot to swing back
-        //Second climber hook reaches up to grab bar
-        //Second climber hook pulls down on bar 
-        //First climber hook comes off of bar
-        //Angle of robot changes again
-        //First climber hook grabs second bar
-        //First climber hook pulls down
-        // Second climber hook reach for final bar
-        //Second climber hook pulls down 
-        //Angle of robot changes again
-        //First climber hook grabs the final bar
-        //First climber hook and second climber hook are on the same level at the same height
 
   /*frc::Pose2d FieldPosition = m_odometry.GetPose();
   //Puts things on the Smart Dashboard
@@ -1110,15 +1533,14 @@ void Robot::TestInit()
 {}
 void Robot::TestPeriodic()
 {}
-
  frc::Trajectory Robot::GenerateTrajectory()
 {
   const frc::Pose2d sideStart{0_ft, 0_ft, frc::Rotation2d(0_deg)};
-  const frc::Pose2d crossScale{6_ft, 0_ft, frc::Rotation2d(0_deg)};
+  const frc::Pose2d crossScale{5.5_ft, 0_ft, frc::Rotation2d(0_deg)};
   std::vector<frc::Translation2d> interiorWaypoints
-    {frc::Translation2d{4_ft, 0_ft},
-    frc::Translation2d{5_ft, 0_ft}};
-  frc::TrajectoryConfig config{12_fps, 8_fps_sq};
+    {frc::Translation2d{2_ft, 0_ft},
+    frc::Translation2d{3_ft, 0_ft}};
+  frc::TrajectoryConfig config{6_fps, 4_fps_sq};
   config.SetReversed(false);
 
   frc::Trajectory trajectory = frc::TrajectoryGenerator::GenerateTrajectory
@@ -1180,7 +1602,7 @@ frc::Trajectory Robot::GenerateTrajectory4()
 frc::Trajectory Robot::GenerateTrajectory5()
 {
   const frc::Pose2d sideStart{0_ft, 0_ft, frc::Rotation2d(0_deg)};
-  const frc::Pose2d crossScale{6_ft, 0_ft, frc::Rotation2d(0_deg)};
+  const frc::Pose2d crossScale{8_ft, 0_ft, frc::Rotation2d(0_deg)}; //6
   std::vector<frc::Translation2d> interiorWaypoints
     {frc::Translation2d{4_ft, 0_ft},
     frc::Translation2d{5_ft, 0_ft}};
